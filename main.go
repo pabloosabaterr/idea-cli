@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	lipgloss "charm.land/lipgloss/v2"
+	glamour "charm.land/glamour/v2"
 )
 
 func (m model) renderFolders() string {
@@ -112,13 +113,18 @@ func (m model) renderPreview(path string) string {
 		return preview
 	}
 
-	bytes, err := os.ReadFile(path)
-	if err != nil  {
+	b, err := os.ReadFile(path)
+	if err != nil {
 		return "Nothing to preview ;)"
 	}
 
-	m.previewCache[path] = string(bytes)
-	return m.previewCache[path]
+	out, err := glamour.Render(string(b), "dark")
+	if err != nil {
+		out = string(b)
+	}
+
+	m.previewCache[path] = out
+	return out
 }
 
 func (m model) View() tea.View {
@@ -131,6 +137,9 @@ func (m model) View() tea.View {
 	h := max(m.height-lipgloss.Height(command), 0)
 	rest := max(m.width-20, 0)
 
+	notesWidth := rest / 2
+	previewWidth := rest - notesWidth
+
 	sidebarStyle := lipgloss.NewStyle().
 		Width(20).
 		Align(lipgloss.Left).
@@ -142,21 +151,42 @@ func (m model) View() tea.View {
 		PaddingLeft(2).
 		Height(h).
 		BorderStyle(lipgloss.RoundedBorder()).
-		Width(rest / 2)
+		Width(notesWidth)
 
 	previewStyle := lipgloss.NewStyle().
 		PaddingLeft(2).
-		Height(h).
+		Height(max(h-3, 0)).
 		BorderStyle(lipgloss.RoundedBorder()).
-		Width(rest - rest/2)
+		Width(previewWidth)
+
+	labelStyle := lipgloss.NewStyle().
+		Bold(true)
 
 	sidebar := sidebarStyle.Render(m.renderFolders())
 	notes := notesStyle.Render(m.renderNotes())
 
-	path := filepath.Join(m.notesDir, m.folders[m.position], m.notes[m.notePosition])
-	preview := previewStyle.Render(m.renderPreview(path))
+	label := "  Preview:"
+	credit := "Made with Love Pablo <3  "
+	gap := max(previewWidth-lipgloss.Width(label)-lipgloss.Width(credit), 0)
 
-	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, notes, preview)
+	header := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		labelStyle.Render(label),
+		strings.Repeat(" ", gap),
+		credit,
+	)
+
+	path := filepath.Join(m.notesDir, m.folders[m.position], m.notes[m.notePosition])
+
+	previewPane := lipgloss.JoinVertical(
+		lipgloss.Left,
+		"",
+		header,
+		"",
+		previewStyle.Render(m.renderPreview(path)),
+	)
+
+	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, notes, previewPane)
 
 	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Left, body, command))
 	v.AltScreen = true
