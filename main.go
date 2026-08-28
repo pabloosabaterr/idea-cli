@@ -11,97 +11,10 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 )
 
-type model struct {
-	notesDir string
-
-	lookingAt bool
-
-	position int
-	notePosition int
-
-	folders []string
-	notes []string
-
-	height int
-	width int
-}
-
-func initModel() model {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return model{}
-	}
-
-	var m model
-	m.notesDir = filepath.Join(home, "notes")
-
-	os.MkdirAll(m.notesDir, 0o755)
-
-	entries, _ := os.ReadDir(m.notesDir)
-
-	for _, e := range entries {
-		if e.IsDir() {
-			m.folders = append(m.folders, e.Name())
-		}
-	}
-
-	m.loadNotes(0)
-
-	return m
-}
-
-func (m model) Init() tea.Cmd {
-	return tea.RequestWindowSize
-}
-
-func (m *model) loadNotes (i int) {
-	m.notes = nil
-	firstDirPath := filepath.Join(m.notesDir, m.folders[i])
-	notes, _ := os.ReadDir(firstDirPath)
-	for _, e := range notes {
-		if filepath.Ext(e.Name()) == ".md" {
-			m.notes = append(m.notes, e.Name())
-		}
-	}
-}
-
-func (m *model) updateNotes(movement int) {
-	if movement == 0 {
-		return
-	}
-
-	if m.lookingAt {
-		next := m.notePosition + movement
-		if next < 0 || next >= len(m.notes) {
-			return
-		}
-		m.notePosition = next
-	} else {
-		next := m.position + movement
-		if next < 0 || next >= len(m.folders) {
-			return
-		}
-		m.position = next
-		m.loadNotes(m.position)
-	}
-}
-
 func (m model) renderFolders() string {
 	lines := make([]string, len(m.folders))
 	for i, f := range m.folders {
 		if i == m.position {
-			lines[i] = "> " + f
-		} else {
-			lines[i] = "  " + f
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
-func (m model) renderNotes() string {
-	lines := make([]string, len(m.notes))
-	for i, f := range m.notes {
-		if i == m.notePosition && m.lookingAt {
 			lines[i] = "> " + f
 		} else {
 			lines[i] = "  " + f
@@ -166,6 +79,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				})
 			}
 		case "esc":
+			if !m.lookingAt {
+				return m, tea.Quit
+			}
 			m.lookingAt = false
         }
 	case tea.WindowSizeMsg:
@@ -173,6 +89,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
     }
     return m, nil
+}
+
+func (m model) renderPreview(path string) (t string) {
+	bytes, err := os.ReadFile(path)
+	if err != nil || !m.lookingAt {
+		return
+	}
+
+	t = string(bytes)
+	return
 }
 
 func (m model) View() tea.View {
@@ -206,7 +132,9 @@ func (m model) View() tea.View {
 
 	sidebar := sidebarStyle.Render(m.renderFolders())
 	notes := notesStyle.Render(m.renderNotes())
-	preview := previewStyle.Render("")
+
+	path := filepath.Join(m.notesDir, m.folders[m.position], m.notes[m.notePosition])
+	preview := previewStyle.Render(m.renderPreview(path))
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, notes, preview)
 
