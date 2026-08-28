@@ -65,7 +65,7 @@ func (m *model) loadNotes (i int) {
 	}
 }
 
-func (m *model) UpdateNotes(movement int) {
+func (m *model) updateNotes(movement int) {
 	if movement == 0 {
 		return
 	}
@@ -86,7 +86,7 @@ func (m *model) UpdateNotes(movement int) {
 	}
 }
 
-func (m model) RenderFolders() string {
+func (m model) renderFolders() string {
 	lines := make([]string, len(m.folders))
 	for i, f := range m.folders {
 		if i == m.position {
@@ -98,7 +98,7 @@ func (m model) RenderFolders() string {
 	return strings.Join(lines, "\n")
 }
 
-func (m model) RenderNotes() string {
+func (m model) renderNotes() string {
 	lines := make([]string, len(m.notes))
 	for i, f := range m.notes {
 		if i == m.notePosition && m.lookingAt {
@@ -119,7 +119,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         case "q", "ctrl+c":
             return m, tea.Quit
 		case "j":
-			m.UpdateNotes(1)
+			m.updateNotes(1)
 		case "tab":
 			/*
 			 Make this work for the notes as well
@@ -132,10 +132,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.position = 0
 				m.loadNotes(m.position)
 			} else {
-				m.UpdateNotes(1)
+				m.updateNotes(1)
 			}
 		case "k":
-			m.UpdateNotes(-1)
+			m.updateNotes(-1)
 		case "shift+tab":
 			/*
 			Look comment for case "tab"
@@ -148,7 +148,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.position = len(m.folders) - 1
 				m.loadNotes(m.position)
 			} else {
-				m.UpdateNotes(-1)
+				m.updateNotes(-1)
 			}
 		case "enter":
 			if !m.lookingAt {
@@ -176,23 +176,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() tea.View {
+	commandsStyle := lipgloss.NewStyle().
+		Height(1).
+		Width(m.width)
+
+	command := commandsStyle.Render("")
+
+	h := max(m.height-lipgloss.Height(command), 0)
+	rest := max(m.width-20, 0)
+
 	sidebarStyle := lipgloss.NewStyle().
 		Width(20).
 		Align(lipgloss.Left).
 		PaddingLeft(2).
-		Height(m.height).
+		Height(h).
 		BorderStyle(lipgloss.RoundedBorder())
 
 	notesStyle := lipgloss.NewStyle().
 		PaddingLeft(2).
-		Height(m.height).
+		Height(h).
 		BorderStyle(lipgloss.RoundedBorder()).
-		Width(m.width - 20)
+		Width(rest / 2)
 
-	sidebar := sidebarStyle.Render(m.RenderFolders())
-	notes := notesStyle.Render(m.RenderNotes())
+	previewStyle := lipgloss.NewStyle().
+		PaddingLeft(2).
+		Height(h).
+		BorderStyle(lipgloss.RoundedBorder()).
+		Width(rest - rest/2)
 
-	v := tea.NewView(lipgloss.JoinHorizontal(lipgloss.Top, sidebar, notes))
+	sidebar := sidebarStyle.Render(m.renderFolders())
+	notes := notesStyle.Render(m.renderNotes())
+	preview := previewStyle.Render("")
+
+	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, notes, preview)
+
+	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Left, body, command))
 	v.AltScreen = true
 	return v
 }
