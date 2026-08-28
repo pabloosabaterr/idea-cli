@@ -18,6 +18,9 @@ type model struct {
 	folders []string
 	notes []string
 
+	notesCache map[string][]string
+	previewCache map[string]string
+
 	height int
 	width int
 }
@@ -40,6 +43,9 @@ func initModel() model {
 			m.folders = append(m.folders, e.Name())
 		}
 	}
+
+	m.notesCache = make(map[string][]string)
+	m.previewCache = make(map[string]string)
 
 	m.loadNotes(0)
 

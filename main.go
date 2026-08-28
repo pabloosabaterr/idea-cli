@@ -23,13 +23,25 @@ func (m model) renderFolders() string {
 	return strings.Join(lines, "\n")
 }
 
-type editorFinishedMsg struct{ err error }
+type editorFinishedMsg struct{
+	path string
+	err error
+}
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     switch msg := msg.(type) {
+	case editorFinishedMsg:
+		delete(m.previewCache, msg.path)
+		delete(m.notesCache, m.folders[m.position])
+
+		pos := m.notePosition
+		m.loadNotes(m.position)
+		if pos < len(m.notes) {
+			m.notePosition = pos
+		}
     case tea.KeyPressMsg:
         switch msg.String() {
-        case "q", "ctrl+c":
+        case "ctrl+c":
             return m, tea.Quit
 		case "j":
 			m.updateNotes(1)
@@ -75,10 +87,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				return m, tea.ExecProcess(exec.Command(editor, path), func(err error) tea.Msg {
-					return editorFinishedMsg{err}
+					return editorFinishedMsg{path, err}
 				})
 			}
-		case "esc":
+		case "q", "esc":
 			if !m.lookingAt {
 				return m, tea.Quit
 			}
@@ -91,14 +103,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     return m, nil
 }
 
-func (m model) renderPreview(path string) (t string) {
-	bytes, err := os.ReadFile(path)
-	if err != nil || !m.lookingAt {
-		return
+func (m model) renderPreview(path string) string {
+	if !m.lookingAt {
+		return "Nothing to preview ;)"
 	}
 
-	t = string(bytes)
-	return
+	if preview, ok := m.previewCache[path]; ok {
+		return preview
+	}
+
+	bytes, err := os.ReadFile(path)
+	if err != nil  {
+		return "Nothing to preview ;)"
+	}
+
+	m.previewCache[path] = string(bytes)
+	return m.previewCache[path]
 }
 
 func (m model) View() tea.View {

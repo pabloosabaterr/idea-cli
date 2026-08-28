@@ -2,14 +2,20 @@ package main
 
 import (
 	"os"
-	"strings"
 	"path/filepath"
+	"strings"
 )
 
 func (m *model) loadNotes(i int) {
 	m.notes = nil
 	m.notePosition = 0
 	if i < 0 || i >= len(m.folders) {
+		return
+	}
+
+	cached, ok := m.notesCache[m.folders[i]]
+	if ok {
+		m.notes = cached
 		return
 	}
 
@@ -20,6 +26,7 @@ func (m *model) loadNotes(i int) {
 			m.notes = append(m.notes, e.Name())
 		}
 	}
+	m.notesCache[m.folders[i]] = m.notes
 }
 
 func (m *model) updateNotes(movement int) {
